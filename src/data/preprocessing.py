@@ -2,32 +2,53 @@
 
 import pandas as pd
 import numpy as np
+from src.config import LOG_TRANSFORM, FREQ
 
-def preprocess_sales_data(
-    df: pd.DataFrame,
-    freq: str = "W"
-) -> pd.DataFrame:
-    """
-    - Convierte 'date' a índice datetime y ordena.
-    - Resamplea a freq (p.ej. 'D', 'W', 'M') sumando ventas.
-    - Rellena valores faltantes por interpolación lineal.
-    - Atenúa outliers usando IQR (clip).
-    """
+def apply_log_transform(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    if LOG_TRANSFORM:
+        df["y"] = np.log(df["sales"] + 1)
+    else:
+        df["y"] = df["sales"]
+    return df
+
+def inverse_log_transform(series: pd.Series) -> pd.Series:
+    if LOG_TRANSFORM:
+        return np.exp(series) - 1
+    return series
+
+def preprocess_sales_data(df: pd.DataFrame, freq: str = None) -> pd.DataFrame:
+    import pandas as pd, numpy as np
+    from src.config import LOG_TRANSFORM, FREQ
+
     df = df.copy()
     df["date"] = pd.to_datetime(df["date"])
     df = df.set_index("date").sort_index()
 
-    # Resample
-    df_resampled = df.resample(freq).sum()
+    fr = freq or FREQ
+    s = df["sales"].resample(fr)
+    df_resampled = s.sum()
+    counts = s.count()
+    df_resampled[counts == 0] = np.nan
 
-    # Interpolación de sales faltantes
-    df_resampled["sales"] = df_resampled["sales"].interpolate(method="linear")
+    # 1) Interpolación lineal
+    df_resampled = df_resampled.to_frame()
+    df_resampled["sales"] = df_resampled["sales"].interpolate(
+        method="linear", limit_direction="both"
+    )
 
-    # Caps de outliers (IQR)
-    q1 = df_resampled["sales"].quantile(0.25)
-    q3 = df_resampled["sales"].quantile(0.75)
-    iqr = q3 - q1
-    lower, upper = q1 - 1.5 * iqr, q3 + 1.5 * iqr
-    df_resampled["sales"] = df_resampled["sales"].clip(lower, upper)
+    # 2) Seasonal median fill (ventana 7 días centrada)
+    df_resampled["sales"] = df_resampled["sales"].fillna(
+        df_resampled["sales"]
+          .rolling(window=7, min_periods=1, center=True)
+          .median()
+    )
+
+    # 3) Winsorizar outliers 1%–99%
+    low, high = (
+        df_resampled["sales"].quantile(0.01),
+        df_resampled["sales"].quantile(0.99)
+    )
+    df_resampled["sales"] = df_resampled["sales"].clip(lower=low, upper=high)
 
     return df_resampled

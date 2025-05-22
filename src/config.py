@@ -7,29 +7,20 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # — Rutas de datos ——————————————————————————————
-DATA_PATH = os.getenv("DATA_PATH")
+DATA_PATH = os.getenv("DATA_PATH", "./src/data/train.csv")
+
+# — Horario de series ———————————————————————————
+# Frecuencia para resample y forecast ("D","W","M",...)
+FREQ = os.getenv("FREQ", "D")
+# Horizonte de prueba y forecast (días)
+HORIZON_DAYS = int(os.getenv("HORIZON_DAYS", "90"))
 
 # — Parámetros de Prophet ————————————————————————
-PROPHET_SEASONALITY_MODE = os.getenv("PROPHET_SEASONALITY_MODE", "additive")
-PROPHET_DAILY_SEASONALITY = os.getenv("PROPHET_DAILY_SEASONALITY", "false").lower() == "true"
-PROPHET_WEEKLY_SEASONALITY = os.getenv("PROPHET_WEEKLY_SEASONALITY", "true").lower() == "true"
-PROPHET_YEARLY_SEASONALITY = os.getenv("PROPHET_YEARLY_SEASONALITY", "true").lower() == "true"
-
-# — Parámetros de LSTM ——————————————————————————
-LSTM_EPOCHS = int(os.getenv("LSTM_EPOCHS", 50))
-LSTM_BATCH_SIZE = int(os.getenv("LSTM_BATCH_SIZE", 32))
-LSTM_UNITS = int(os.getenv("LSTM_UNITS", 64))
-
-def print_config():
-    """Imprime en consola los valores cargados, útil para verificar."""
-    from pprint import pprint
-    pprint({
-        "DATA_PATH": DATA_PATH,
-        "PROPHET_SEASONALITY_MODE": PROPHET_SEASONALITY_MODE,
-        "PROPHET_DAILY_SEASONALITY": PROPHET_DAILY_SEASONALITY,
-        "PROPHET_WEEKLY_SEASONALITY": PROPHET_WEEKLY_SEASONALITY,
-        "PROPHET_YEARLY_SEASONALITY": PROPHET_YEARLY_SEASONALITY,
-        "LSTM_EPOCHS": LSTM_EPOCHS,
-        "LSTM_BATCH_SIZE": LSTM_BATCH_SIZE,
-        "LSTM_UNITS": LSTM_UNITS,
-    })
+PROPHET_SEASONALITY_MODE    = os.getenv("PROPHET_SEASONALITY_MODE", "additive")
+PROPHET_DAILY_SEASONALITY   = os.getenv("PROPHET_DAILY_SEASONALITY", "true").lower() == "true"
+PROPHET_WEEKLY_SEASONALITY  = os.getenv("PROPHET_WEEKLY_SEASONALITY", "true").lower() == "true"
+PROPHET_YEARLY_SEASONALITY  = os.getenv("PROPHET_YEARLY_SEASONALITY", "true").lower() == "true"
+CP_PRIOR_SCALES             = [float(x) for x in os.getenv("CP_PRIOR_SCALES", "0.001,0.01,0.1,0.2").split(",")]
+SEASONALITY_PRIOR_SCALES    = [float(x) for x in os.getenv("SEASONALITY_PRIOR_SCALES", "0.01,0.1,0.5,1.0").split(",")]
+CHANGEPNT_RANGE             = float(os.getenv("CHANGEPNT_RANGE", "0.8"))
+LOG_TRANSFORM               = os.getenv("LOG_TRANSFORM", "false").lower() == "true"

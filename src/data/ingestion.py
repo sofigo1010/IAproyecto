@@ -1,63 +1,47 @@
-# src/data/ingestion.py
-
 import pandas as pd
-from typing import List, Union, IO
+from typing import IO, Union
 from src.config import DATA_PATH
 
-# Columnas mínimas que debe tener tu CSV
-REQUIRED_COLUMNS = ["date", "sales", "store_id"]
+# Ahora solo validamos que existan estas columnas
+REQUIRED_COLUMNS = ["Order Date", "Sales"]
 
-def load_sales_data(
-    source: Union[str, IO] = None
-) -> pd.DataFrame:
+def load_sales_data(source: Union[str, IO] = None) -> pd.DataFrame:
     """
-    Lee un CSV de ventas desde:
-      - un path (str), o
-      - un file-like (IO), p.ej. UploadFile.file de FastAPI.
-
-    Si source es None, usa DATA_PATH de config.
+    Lee el CSV (Superstore), renombra columnas a date/sales,
+    agrupa ventas diarias y, si existe Profit, también agrupa profit.
     """
-    csv_source = source if source is not None else DATA_PATH
-    try:
-        df = pd.read_csv(csv_source)
-        return df
-    except FileNotFoundError:
-        raise FileNotFoundError(f"No se encontró el archivo en {csv_source}")
-    except Exception as e:
-        raise RuntimeError(f"Error al leer CSV: {e}")
-
-def validate_sales_data(df: pd.DataFrame, required_cols: List[str] = REQUIRED_COLUMNS) -> None:
-    """
-    Verifica que el DataFrame contenga las columnas esperadas.
-    Lanza ValueError si falta alguna.
-    """
-    missing = set(required_cols) - set(df.columns)
+    path = source or DATA_PATH
+    df = pd.read_csv(path)
+    missing = set(REQUIRED_COLUMNS) - set(df.columns)
     if missing:
-        raise ValueError(f"Faltan columnas requeridas: {missing}")
+        raise ValueError(f"Faltan columnas en el CSV: {missing}")
+
+    # Renombrar las que sí existen
+    df = df.rename(columns={
+        "Order Date": "date",
+        "Sales": "sales",
+        **({"Profit": "profit"} if "Profit" in df.columns else {})
+    })
+
+    # Fecha → datetime
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    # Drop solo date y sales (profit si no existe no se menciona)
+    df = df.dropna(subset=["date", "sales"])
+
+    # Si existe profit, dropna ahí también
+    if "profit" in df.columns:
+        df = df.dropna(subset=["profit"])
+
+    # Agrupar por día
+    agg_dict = {"sales": "sum"}
+    if "profit" in df.columns:
+        agg_dict["profit"] = "sum"
+    df_daily = df.groupby("date", as_index=False).agg(agg_dict)
+    return df_daily
 
 def clean_sales_data(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Manejo básico de datos faltantes y transformación de tipos:
-      - Convierte 'date' a datetime
-      - Elimina filas sin fecha o sin ventas
-    """
-    df["date"] = pd.to_datetime(df["date"], errors="coerce")
-    df = df.dropna(subset=["date", "sales"])
     return df
 
-def load_and_prepare_data(
-    source: Union[str, IO] = None
-) -> pd.DataFrame:
-    """
-    Pipeline completo: cargar (path o file-like), validar y limpiar datos.
-    """
+def load_and_prepare_data(source: Union[str, IO] = None) -> pd.DataFrame:
     df = load_sales_data(source)
-    validate_sales_data(df)
-    df = clean_sales_data(df)
-    return df
-
-if __name__ == "__main__":
-    # Prueba rápida desde disco
-    df = load_and_prepare_data()
-    print(df.head())
-    print(f"Total registros: {len(df)}")
+    return clean_sales_data(df)

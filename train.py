@@ -1,37 +1,37 @@
+# train.py
+
 #!/usr/bin/env python3
-"""
-train.py – Script principal para entrenar y predecir con Prophet
-"""
 
 import os
+from src.config import FREQ
 from src.data.ingestion import load_and_prepare_data
 from src.data.preprocessing import preprocess_sales_data
-from src.models.prophet_model import train_prophet, predict_prophet
+from src.models.prophet_model import tune_prophet, train_prophet
+from src.models.ensemble import fit_and_forecast
 
 def main():
-    # 1. Carga y limpieza inicial (desde DATA_PATH o frontend)
+    # 1) Carga y preprocesado
     df_raw = load_and_prepare_data()
+    df_ts  = preprocess_sales_data(df_raw, freq=FREQ)
 
-    # 2. Preprocesamiento (resample semanal)
-    df_ts = preprocess_sales_data(df_raw, freq='W')
+    # 2) Hiperajuste de Prophet
+    best = tune_prophet(df_ts)
+    print(f"🏅 Mejor Prophet → CPS={best['cps']}, SPS={best['sps']}")
 
-    # 3. Entrenamiento del modelo Prophet
-    print("Entrenando modelo Prophet...")
-    model = train_prophet(df_ts)
-    print("Modelo entrenado y guardado en models/prophet_model.joblib")
+    # 3) Entrenar Prophet con esos hiperparámetros
+    train_prophet(
+        df_ts,
+        changepoint_prior_scale=best["cps"],
+        seasonality_prior_scale=best["sps"]
+    )
 
-    # 4. Generar pronóstico de 12 semanas
-    print("Generando pronóstico de 12 semanas...")
-    forecast = predict_prophet(model=model, periods=12, freq='W')
-    
-    # 5. Guardar pronóstico en CSV
+    # 4) Forecast ensemble (Prophet + XGBoost residual)
+    forecast = fit_and_forecast(df_ts)
+
+    # 5) Guardar
     os.makedirs("models", exist_ok=True)
-    forecast_csv = "models/forecast.csv"
-    forecast.to_csv(forecast_csv, index=False)
-    print(f"Pronóstico guardado en {forecast_csv}")
-
-    # 6. Mostrar últimas líneas del pronóstico
-    print(forecast.tail())
+    forecast.to_csv("models/forecast_ensemble.csv", index=False)
+    print("✅ Forecast ensemble guardado en models/forecast_ensemble.csv")
 
 if __name__ == "__main__":
     main()
