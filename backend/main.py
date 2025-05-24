@@ -4,22 +4,21 @@
 import sys
 from pathlib import Path
 
-# 1) Inyecta backend/src en el PYTHONPATH
+# 1) Inyecta backend/ en el PYTHONPATH para que “src” sea importable
 BASE_DIR = Path(__file__).resolve().parent        # …/IAproyecto/backend
-SRC_DIR  = BASE_DIR / "src"                       # …/IAproyecto/backend/src
-sys.path.insert(0, str(SRC_DIR))
+sys.path.insert(0, str(BASE_DIR))
 
 # 2) Imports
-from fastapi                import FastAPI, File, UploadFile
+from fastapi                 import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-import pandas               as pd
+import pandas                as pd
 import joblib
 import torch
 
 # ahora las importaciones en tu código pueden usar src.* tal como en tus módulos existentes
-from src.config             import FREQ
-from src.models.LSTM_model  import LSTMModel
-from src.models.prophet_model import load_model, _add_date_regressors
+from src.config               import FREQ
+from src.models.LSTM_model    import LSTMModel
+from src.models.prophet_model import _add_date_regressors
 
 # 3) Crea la app y habilita CORS
 app = FastAPI()
@@ -53,7 +52,7 @@ lstm_model.eval()
 prophet_model = joblib.load(PROPHET_PATH)
 xgb_model     = joblib.load(XGB_PATH)
 
-# 7) Endpoint para recibir CSV y devolver predicciones
+# 7) Endpoint para recibir CSV y devolver SOLO LSTM y ENSEMBLE
 @app.post("/predict-csv")
 async def predict_csv(file: UploadFile = File(...)):
     """
@@ -61,7 +60,9 @@ async def predict_csv(file: UploadFile = File(...)):
         'fecha'         (YYYY-MM-DD)
         'ventas_previas'
         'otras_vars'
-    - Devuelve JSON con las predicciones de lstm, prophet, xgb_residual y ensemble.
+    - Devuelve JSON con las predicciones de:
+        • lstm
+        • ensemble (lstm + prophet + xgb_residual)
     """
     df = pd.read_csv(file.file)
     results = []
@@ -77,24 +78,19 @@ async def predict_csv(file: UploadFile = File(...)):
         with torch.no_grad():
             p_lstm = lstm_model(tensor).item()
 
-        # — Prophet —
-        tmp     = pd.DataFrame({"ds": [fecha]})
-        tmp     = _add_date_regressors(tmp)
-        p_prop  = prophet_model.predict(tmp)["yhat"].iloc[0]
-
-        # — XGB residual —
-        df_res  = pd.DataFrame({"prophet": [p_prop]})
-        p_xgb   = xgb_model.predict(df_res)[0]
+        # — Prophet + XGB residual (para el ensemble) —
+        tmp    = pd.DataFrame({"ds": [fecha]})
+        tmp    = _add_date_regressors(tmp)
+        p_prop = prophet_model.predict(tmp)["yhat"].iloc[0]
+        p_xgb  = xgb_model.predict(pd.DataFrame({"prophet": [p_prop]}))[0]
 
         # — Ensamble final —
         p_ens = p_lstm + p_prop + p_xgb
 
         results.append({
-            "fecha":        fecha,
-            "lstm":         p_lstm,
-            "prophet":      p_prop,
-            "xgb_residual": p_xgb,
-            "ensemble":     p_ens
+            "fecha":    fecha,
+            "lstm":     p_lstm,
+            "ensemble": p_ens
         })
 
     return {"predictions": results}
