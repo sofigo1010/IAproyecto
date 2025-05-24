@@ -21,7 +21,7 @@ export default function Header() {
           </nav>
 
           <Link href="/upload" className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium">
-            Comenzar Gratis
+            Empezar
           </Link>
         </div>
       </div>

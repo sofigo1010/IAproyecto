@@ -26,10 +26,6 @@ export default function Hero() {
                 Empieza a predecir tu futuro
                 <ArrowRight className="h-5 w-5" />
               </Link>
-
-              <button className="border border-gray-600 text-white px-8 py-4 rounded-lg font-bold text-lg hover:bg-gray-800">
-                Ver demo
-              </button>
             </div>
 
             <div className="flex items-center gap-8 text-gray-400">
