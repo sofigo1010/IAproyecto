@@ -27,10 +27,6 @@ export default function CallToAction() {
               Empieza a predecir tu futuro
               <ArrowRight className="h-5 w-5" />
             </Link>
-
-            <button className="border border-gray-600 text-white px-8 py-4 rounded-lg font-bold text-lg hover:bg-gray-800">
-              Ver ejemplos
-            </button>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 pt-8 border-t border-gray-800">

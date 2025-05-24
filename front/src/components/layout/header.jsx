@@ -11,14 +11,7 @@ export default function Header() {
             <span className="text-2xl font-bold text-white">SalesVision AI</span>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-8">
-            <Link href="/" className="text-gray-300 hover:text-white">
-              Inicio
-            </Link>
-            <Link href="/upload" className="text-gray-300 hover:text-white">
-              Subir Datos
-            </Link>
-          </nav>
+
 
           <Link href="/upload" className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium">
             Empezar
